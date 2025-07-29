@@ -123,50 +123,50 @@ class IntelligentRAGSystem:
         self._initialize_vector_store()
         logger.info("IntelligentRAGSystem initialized successfully")
         
-   def _initialize_vector_store(self):
-    """Initialize or connect to existing Qdrant collection"""
-    try:
-        # Create Qdrant client
-        qdrant_client = QdrantClient(url=QDRANT_URL)
-        
-        # Check if collection exists
-        collections = qdrant_client.get_collections().collections
-        collection_exists = any(col.name == COLLECTION_NAME for col in collections)
-        
-        if not collection_exists:
-            logger.info(f"Creating new Qdrant collection: {COLLECTION_NAME}")
-            # Create collection with proper vector size
-            qdrant_client.create_collection(
-                collection_name=COLLECTION_NAME,
-                vectors_config=VectorParams(
-                    size=1536,  # Ada-002 embedding size
-                    distance=Distance.COSINE
-                )
-            )
-        
-        # Initialize vector store with correct parameters
-        self.vector_store = QdrantVectorStore(
-            client=qdrant_client,
-            collection_name=COLLECTION_NAME,
-            embeddings=embedding_model  # Note: 'embeddings' not 'embedding'
-        )
-        logger.info("Vector store initialized successfully")
-        
-    except Exception as e:
-        logger.error(f"Error initializing vector store: {e}")
-        # Fallback: Create new vector store
+    def _initialize_vector_store(self):
+        """Initialize or connect to existing Qdrant collection"""
         try:
+            # Create Qdrant client
             qdrant_client = QdrantClient(url=QDRANT_URL)
+            
+            # Check if collection exists
+            collections = qdrant_client.get_collections().collections
+            collection_exists = any(col.name == COLLECTION_NAME for col in collections)
+            
+            if not collection_exists:
+                logger.info(f"Creating new Qdrant collection: {COLLECTION_NAME}")
+                # Create collection with proper vector size
+                qdrant_client.create_collection(
+                    collection_name=COLLECTION_NAME,
+                    vectors_config=VectorParams(
+                        size=1536,  # Ada-002 embedding size
+                        distance=Distance.COSINE
+                    )
+                )
+            
+            # Initialize vector store with correct parameters
             self.vector_store = QdrantVectorStore(
                 client=qdrant_client,
                 collection_name=COLLECTION_NAME,
-                embeddings=embedding_model
+                embedding=embedding_model  # Note: 'embeddings' not 'embedding'
             )
-            logger.info("Fallback vector store initialization successful")
-        except Exception as fallback_error:
-            logger.error(f"Fallback initialization also failed: {fallback_error}")
-            raise fallback_error
-    
+            logger.info("Vector store initialized successfully")
+            
+        except Exception as e:
+            logger.error(f"Error initializing vector store: {e}")
+            # Fallback: Create new vector store
+            try:
+                qdrant_client = QdrantClient(url=QDRANT_URL)
+                self.vector_store = QdrantVectorStore(
+                    client=qdrant_client,
+                    collection_name=COLLECTION_NAME,
+                    embeddings=embedding_model
+                )
+                logger.info("Fallback vector store initialization successful")
+            except Exception as fallback_error:
+                logger.error(f"Fallback initialization also failed: {fallback_error}")
+                raise fallback_error
+        
     def _initialize_clause_patterns(self) -> Dict[ClauseType, List[str]]:
         """Initialize regex patterns for different clause types"""
         return {
