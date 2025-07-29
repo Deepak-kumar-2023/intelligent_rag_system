@@ -1,4 +1,5 @@
 # intelligent_rag_system.py
+# intelligent_rag_system.py
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass, asdict
 from enum import Enum
@@ -9,8 +10,9 @@ from datetime import datetime
 from pathlib import Path
 import logging
 
+# Updated imports to fix deprecation warnings
 from langchain_qdrant import QdrantVectorStore
-from langchain.document_loaders import PyPDFLoader, Docx2txtLoader, UnstructuredEmailLoader
+from langchain_community.document_loaders import PyPDFLoader, Docx2txtLoader, UnstructuredEmailLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.schema import Document
 from qdrant_client import QdrantClient
@@ -121,43 +123,49 @@ class IntelligentRAGSystem:
         self._initialize_vector_store()
         logger.info("IntelligentRAGSystem initialized successfully")
         
-    def _initialize_vector_store(self):
-        """Initialize or connect to existing Qdrant collection"""
-        try:
-            # Create Qdrant client
-            qdrant_client = QdrantClient(url=QDRANT_URL)
-            
-            # Check if collection exists
-            collections = qdrant_client.get_collections().collections
-            collection_exists = any(col.name == COLLECTION_NAME for col in collections)
-            
-            if not collection_exists:
-                logger.info(f"Creating new Qdrant collection: {COLLECTION_NAME}")
-                # Create collection with proper vector size
-                qdrant_client.create_collection(
-                    collection_name=COLLECTION_NAME,
-                    vectors_config=VectorParams(
-                        size=1536,  # Ada-002 embedding size
-                        distance=Distance.COSINE
-                    )
+   def _initialize_vector_store(self):
+    """Initialize or connect to existing Qdrant collection"""
+    try:
+        # Create Qdrant client
+        qdrant_client = QdrantClient(url=QDRANT_URL)
+        
+        # Check if collection exists
+        collections = qdrant_client.get_collections().collections
+        collection_exists = any(col.name == COLLECTION_NAME for col in collections)
+        
+        if not collection_exists:
+            logger.info(f"Creating new Qdrant collection: {COLLECTION_NAME}")
+            # Create collection with proper vector size
+            qdrant_client.create_collection(
+                collection_name=COLLECTION_NAME,
+                vectors_config=VectorParams(
+                    size=1536,  # Ada-002 embedding size
+                    distance=Distance.COSINE
                 )
-            
-            # Initialize vector store
-            self.vector_store = QdrantVectorStore.from_existing_collection(
-                url=QDRANT_URL,
-                collection_name=COLLECTION_NAME,
-                embedding=embedding_model
             )
-            logger.info("Vector store initialized successfully")
-            
-        except Exception as e:
-            logger.error(f"Error initializing vector store: {e}")
-            # Create new collection if error
+        
+        # Initialize vector store with correct parameters
+        self.vector_store = QdrantVectorStore(
+            client=qdrant_client,
+            collection_name=COLLECTION_NAME,
+            embeddings=embedding_model  # Note: 'embeddings' not 'embedding'
+        )
+        logger.info("Vector store initialized successfully")
+        
+    except Exception as e:
+        logger.error(f"Error initializing vector store: {e}")
+        # Fallback: Create new vector store
+        try:
+            qdrant_client = QdrantClient(url=QDRANT_URL)
             self.vector_store = QdrantVectorStore(
-                url=QDRANT_URL,
+                client=qdrant_client,
                 collection_name=COLLECTION_NAME,
-                embedding=embedding_model
+                embeddings=embedding_model
             )
+            logger.info("Fallback vector store initialization successful")
+        except Exception as fallback_error:
+            logger.error(f"Fallback initialization also failed: {fallback_error}")
+            raise fallback_error
     
     def _initialize_clause_patterns(self) -> Dict[ClauseType, List[str]]:
         """Initialize regex patterns for different clause types"""
@@ -658,7 +666,7 @@ class IntelligentRAGSystem:
             
             # Get response from Azure OpenAI
             response = client.chat.completions.create(
-                model="gpt-4o-mini",
+                model="gpt-4.1",
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
